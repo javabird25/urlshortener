@@ -1,7 +1,8 @@
 from django.urls import path
 
-from .views import hello
+from . import views
 
 urlpatterns = [
-    path('hello/', hello),
+    path('shorten/', views.shorten_view),
+    path('unshorten/', views.unshorten_view),
 ]

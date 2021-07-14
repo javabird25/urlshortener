@@ -1,3 +1,6 @@
 from django.db import models
 
-# Create your models here.
+
+class ShortUrl(models.Model):
+    slug = models.SlugField(verbose_name='Slug (shortened URL without http://domain/ part)', primary_key=True)
+    url = models.URLField(verbose_name='Shortened URL')
