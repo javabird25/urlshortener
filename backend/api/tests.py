@@ -35,7 +35,7 @@ class ShorteningAPIEndpointTestCase(APITestCase):
 
     def test_empty_request_body(self):
         response = self.client.post(SHORTEN_ENDPOINT)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(400, response.status_code)
 
     def test_status_code_is_200(self):
         self.assertTrue(all([resp.status_code == 200 for resp in self.responses]))
@@ -61,9 +61,7 @@ class CustomSlugShorteningAPIEndpointTestCase(APITestCase):
 class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
     def test_response_content(self):
         slug = self.client.post(SHORTEN_ENDPOINT, {'url': EXAMPLE_DOT_COM}).content.decode()
-        self.assertEqual(len(slug), 6,
-                         msg='unexpected request length. '
-                             f'Request content repr: {slug!r}')
+        self.assertEqual(6, len(slug), f'unexpected request length. Request content repr: {slug!r}')
 
     @patch('api.shorten.generate_unique_slug')
     def test_exhausted_random_slug_space(self, generate_unique_slug):
@@ -119,17 +117,17 @@ class UnshorteningAPIEndpointTestCase(APITestCase):
     def test_unshorten(self):
         actual_url = get_response_str(self.response)
 
-        self.assertEqual(actual_url, EXAMPLE_DOT_COM)
+        self.assertEqual(EXAMPLE_DOT_COM, actual_url)
 
     def test_unshorten_unknown(self):
         response = self.unshorten({'slug': 'not_there'})
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(404, response.status_code)
 
     def test_slug_not_specified(self):
         response = self.unshorten(None)
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(400, response.status_code)
 
 
 class ShortenUnshortenTestCase(TestCase):
@@ -137,7 +135,7 @@ class ShortenUnshortenTestCase(TestCase):
         shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
 
         short_url_model = ShortUrl.objects.get(slug=SLUG_EXAMPLE)
-        self.assertEqual(short_url_model.url, EXAMPLE_DOT_COM)
+        self.assertEqual(EXAMPLE_DOT_COM, short_url_model.url)
 
     def test_shorten_duplicate_slug(self):
         shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
@@ -157,7 +155,7 @@ class ShortenUnshortenTestCase(TestCase):
 
         long_url = shorten.unshorten(SLUG_EXAMPLE)
 
-        self.assertEqual(long_url, EXAMPLE_DOT_COM)
+        self.assertEqual(EXAMPLE_DOT_COM, long_url)
 
     def test_unshorten_unknown_url(self):
         with self.assertRaises(shorten.UnshortenError):
@@ -169,7 +167,7 @@ class ShortenUnshortenTestCase(TestCase):
         shorten.shorten(SLUG_EXAMPLE, expected_long_url)
         actual_long_url = shorten.unshorten(SLUG_EXAMPLE)
 
-        self.assertEqual(actual_long_url, expected_long_url)
+        self.assertEqual(expected_long_url, actual_long_url)
 
 
 class ShortUrlModelTestCase(TestCase):
@@ -178,8 +176,8 @@ class ShortUrlModelTestCase(TestCase):
 
         model = ShortUrl(slug=slug, url=EXAMPLE_DOT_COM)
 
-        self.assertEqual(model.slug, '123456')
-        self.assertEqual(model.url, EXAMPLE_DOT_COM)
+        self.assertEqual('123456', model.slug)
+        self.assertEqual(EXAMPLE_DOT_COM, model.url)
 
     def test_create_bad_url(self):
         with self.assertRaises(ValidationError):
