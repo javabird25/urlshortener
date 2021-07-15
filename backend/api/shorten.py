@@ -20,22 +20,22 @@ def shorten(slug: str, url: str):
     short_url.save()
 
 
-def shorten_random(url: str, desired_slug_length: int) -> str:
-    if desired_slug_length < 1:
-        raise ShortenError(f'invalid {desired_slug_length=}')
-
-    slug = _generate_slug(desired_slug_length)
-    try:
-        shorten(slug, url)
-    except ShortenDuplicateError:
-        # Random slug collision, try again
-        return shorten_random(url, desired_slug_length)
-
+def generate_unique_slug(length: int) -> str:
+    if length < 1:
+        raise ValueError(f'invalid {length=}')
+    slug = ''.join(random.choices(_SYMBOLS, k=length))
+    if ShortUrl.objects.filter(slug=slug).exists():
+        # Just generated an occupied slug, try again
+        try:
+            return generate_unique_slug(length)
+        except RecursionError:
+            # Slug space of this length is (almost) exhausted
+            raise RandomSlugSpaceExhaustedError()
     return slug
 
 
-def _generate_slug(length: int) -> str:
-    return ''.join(random.choices(_SYMBOLS, k=length))
+class RandomSlugSpaceExhaustedError(Exception):
+    pass
 
 
 def unshorten(slug: str) -> str:

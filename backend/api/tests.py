@@ -4,14 +4,16 @@ from unittest.mock import patch
 from django.http.response import HttpResponse
 from django.test.testcases import TestCase
 from django.core.exceptions import ValidationError
-from django.urls.conf import path
 from rest_framework.test import APITestCase
 from parameterized import parameterized
 
-from .shorten import ShortenBadInputError, shorten, shorten_random, unshorten, ShortenError, ShortenDuplicateError, UnshortenError
+from . import shorten
 from .models import ShortUrl
+from .shorten import RandomSlugSpaceExhaustedError
 
+SHORTEN_ENDPOINT = '/api/shorten/'
 EXAMPLE_DOT_COM = 'http://example.com'
+SOME_DIFFERENT_URL_DOT_COM = 'http://somedifferenturl.com'
 SLUG_EXAMPLE = 'my_slug'
 
 
@@ -20,38 +22,90 @@ def get_response_str(response: HttpResponse):
 
 
 class ShorteningAPIEndpointTestCase(APITestCase):
-    ...
-
-
-class RandomShorteningAPIEndpointTestCase(APITestCase):
     def setUp(self):
-        self.response = self.shorten_random(EXAMPLE_DOT_COM)
-
-    def shorten_random(self, url):
-        return self.client.post('/api/shorten/', {'url': url})
-
-    def get_received_slug(self):
-        return get_response_str(self.response)
-
-    def test_200(self):
-        self.assertEqual(self.response.status_code, 200)
-
-    def test_content_type(self):
-        self.assertEqual(self.response.headers['Content-Type'],
-                         'text/plain; charset=utf-8')
-
-    def test_response_content(self):
-        self.assertEqual(len(self.get_received_slug()), 6,
-                         msg=f'unexpected request length. Request content repr: {self.get_received_slug()!r}')
+        self.custom_slug_response = self.client.post(SHORTEN_ENDPOINT,
+                                                     {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
+        self.random_slug_response = self.client.post(SHORTEN_ENDPOINT,
+                                                     {'url': EXAMPLE_DOT_COM})
+        self.responses = [self.custom_slug_response, self.random_slug_response]
 
     def test_saves_to_db(self):
-        slug = self.get_received_slug()
-        url_model = ShortUrl.objects.get(slug=slug, url=EXAMPLE_DOT_COM)
-        self.assertTrue(url_model)
+        self.assertEqual(2, len(ShortUrl.objects.filter(url=EXAMPLE_DOT_COM)))
+        self.assertTrue(ShortUrl.objects.filter(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM))
 
     def test_empty_request_body(self):
-        response = self.client.post('/api/shorten/')
+        response = self.client.post(SHORTEN_ENDPOINT)
         self.assertEqual(response.status_code, 400)
+
+    def test_status_code_is_200(self):
+        self.assertTrue(all([resp.status_code == 200 for resp in self.responses]))
+
+    def test_content_type(self):
+        self.assertTrue(all([resp.headers['Content-Type'] == 'text/plain; charset=utf-8'
+                             for resp in self.responses]))
+
+    def test_occupied_slug(self):
+        response = self.client.post(SHORTEN_ENDPOINT,
+                                    {'url': SOME_DIFFERENT_URL_DOT_COM, 'slug': SLUG_EXAMPLE})
+        self.assertEqual(409, response.status_code)
+        self.assertEqual('This slug is already occupied.', response.content.decode())
+
+
+class CustomSlugShorteningAPIEndpointTestCase(APITestCase):
+    def test_response_contains_slug(self):
+        response = self.client.post(SHORTEN_ENDPOINT,
+                                    {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
+        self.assertEqual(SLUG_EXAMPLE, response.content.decode())
+
+
+class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
+    def test_response_content(self):
+        slug = self.client.post(SHORTEN_ENDPOINT, {'url': EXAMPLE_DOT_COM}).content.decode()
+        self.assertEqual(len(slug), 6,
+                         msg='unexpected request length. '
+                             f'Request content repr: {slug!r}')
+
+    @patch('api.shorten.generate_unique_slug')
+    def test_exhausted_random_slug_space(self, generate_unique_slug):
+        generate_unique_slug.side_effect = RandomSlugSpaceExhaustedError()
+
+        response = self.client.post(SHORTEN_ENDPOINT, {'url': EXAMPLE_DOT_COM})
+
+        self.assertEqual(409, response.status_code)
+        self.assertEqual('Random slug space is exhausted. Try shortening with a longer slug.',
+                         response.content.decode())
+
+
+class GenerateUniqueSlugTestCase(TestCase):
+    def test_generate(self):
+        slug = shorten.generate_unique_slug(6)
+
+        self.assertEqual(6, len(slug))
+
+    @patch('random.choices')
+    def test_random_slug_collision(self, choices):
+        colliding_slug = '123456'
+        different_slug = '654321'
+        ShortUrl(slug=colliding_slug, url=EXAMPLE_DOT_COM).save()
+        choices.side_effect = [colliding_slug, different_slug]
+
+        slug = shorten.generate_unique_slug(6)
+
+        self.assertEqual(different_slug, slug)
+
+    @patch('random.choices')
+    def test_all_slugs_occupied(self, choices):
+        slug = '1'
+        ShortUrl(slug=slug, url=EXAMPLE_DOT_COM).save()
+        choices.return_value = slug
+
+        with self.assertRaises(RandomSlugSpaceExhaustedError):
+            shorten.generate_unique_slug(1)
+
+    @parameterized.expand([(0,), (-1,)])
+    def test_bad_length(self, length):
+        with self.assertRaises(ValueError, msg=f'failed to disallow length {length}'):
+            shorten.generate_unique_slug(length)
 
 
 class UnshorteningAPIEndpointTestCase(APITestCase):
@@ -80,72 +134,42 @@ class UnshorteningAPIEndpointTestCase(APITestCase):
 
 class ShortenUnshortenTestCase(TestCase):
     def test_shorten_saves_to_db(self):
-        shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
+        shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
 
         short_url_model = ShortUrl.objects.get(slug=SLUG_EXAMPLE)
         self.assertEqual(short_url_model.url, EXAMPLE_DOT_COM)
 
     def test_shorten_duplicate_slug(self):
-        shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
-        with self.assertRaises(ShortenDuplicateError):
-            shorten(SLUG_EXAMPLE, 'http://somedifferenturl.com')
+        shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
+        with self.assertRaises(shorten.ShortenDuplicateError):
+            shorten.shorten(SLUG_EXAMPLE, SOME_DIFFERENT_URL_DOT_COM)
 
     def test_shorten_bad_slug(self):
-        with self.assertRaises(ShortenBadInputError):
-            shorten(', !"', EXAMPLE_DOT_COM)
+        with self.assertRaises(shorten.ShortenBadInputError):
+            shorten.shorten(', !"', EXAMPLE_DOT_COM)
 
     def test_shorten_bad_url(self):
-        with self.assertRaises(ShortenBadInputError):
-            shorten(SLUG_EXAMPLE, 'not an URL')
+        with self.assertRaises(shorten.ShortenBadInputError):
+            shorten.shorten(SLUG_EXAMPLE, 'not an URL')
 
     def test_unshorten_loads_from_db(self):
         ShortUrl(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM).save()
 
-        long_url = unshorten(SLUG_EXAMPLE)
+        long_url = shorten.unshorten(SLUG_EXAMPLE)
 
         self.assertEqual(long_url, EXAMPLE_DOT_COM)
 
     def test_unshorten_unknown_url(self):
-        with self.assertRaises(UnshortenError):
-            unshorten(SLUG_EXAMPLE)
+        with self.assertRaises(shorten.UnshortenError):
+            shorten.unshorten(SLUG_EXAMPLE)
 
     def test_shorten_unshorten(self):
         expected_long_url = EXAMPLE_DOT_COM
 
-        shorten(SLUG_EXAMPLE, expected_long_url)
-        actual_long_url = unshorten(SLUG_EXAMPLE)
+        shorten.shorten(SLUG_EXAMPLE, expected_long_url)
+        actual_long_url = shorten.unshorten(SLUG_EXAMPLE)
 
         self.assertEqual(actual_long_url, expected_long_url)
-
-
-class ShortenRandomTestCase(TestCase):
-    @patch('api.shorten.shorten')
-    def test_delegates_to_shorten(self, shorten_mock):
-        slug = shorten_random(EXAMPLE_DOT_COM, 6)
-
-        shorten_mock.assert_called_with(slug, EXAMPLE_DOT_COM)
-
-    def test_short_link_length(self):
-        links = [shorten_random(EXAMPLE_DOT_COM, 5),
-                 shorten_random(EXAMPLE_DOT_COM, 6)]
-
-        self.assertEqual([len(l) for l in links], [5, 6])
-
-    @parameterized.expand([(0,), (-1,), (51,)])
-    def test_bad_length(self, length):
-        with self.assertRaises(ShortenError, msg=f'failed to disallow length {length}'):
-            shorten_random(EXAMPLE_DOT_COM, length)
-
-    @patch('random.choices')
-    def test_random_slug_collision(self, choices):
-        colliding_slug = '123456'
-        different_slug = '654321'
-        ShortUrl(slug=colliding_slug, url=EXAMPLE_DOT_COM).save()
-        choices.side_effect = [colliding_slug, different_slug]
-
-        slug = shorten_random('http://differenturl.com', 6)
-
-        self.assertEqual(slug, different_slug)
 
 
 class ShortUrlModelTestCase(TestCase):
