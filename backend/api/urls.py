@@ -3,6 +3,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('shorten/', views.shorten_view),
-    path('unshorten/', views.unshorten_view),
+    path('api/shorten/', views.shorten_view),
+    path('api/unshorten/', views.unshorten_view),
+    path('<slug:slug>/', views.redirect_view),
+    path('<slug:slug>', views.redirect_view),
 ]

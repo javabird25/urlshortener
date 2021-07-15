@@ -1,4 +1,6 @@
+from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
+from django.shortcuts import redirect
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ParseError
 from rest_framework.request import Request
@@ -47,3 +49,10 @@ def unshorten_view(request: Request) -> HttpResponse:
     except KeyError:
         return HttpResponseBadRequest()
     return HttpResponse(url)
+
+
+def redirect_view(request: HttpRequest, slug: str) -> HttpResponse:
+    try:
+        return redirect(shorten.unshorten(slug))
+    except shorten.UnshortenError:
+        return HttpResponseNotFound()

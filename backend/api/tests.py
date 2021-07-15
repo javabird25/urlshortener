@@ -1,4 +1,3 @@
-from unittest.case import skip
 from unittest.mock import patch
 
 from django.http.response import HttpResponse
@@ -195,3 +194,27 @@ class ShortUrlModelTestCase(TestCase):
     def test_url_too_long(self):
         with self.assertRaises(ValidationError):
             ShortUrl(slug='1', url='http://' + 'a' * 200 + '.com').full_clean()
+
+
+class RedirectionTestCase(TestCase):
+    @parameterized.expand([
+        ('with trailing backslash', f'/{SLUG_EXAMPLE}/'),
+        ('without trailing backslash', f'/{SLUG_EXAMPLE}'),
+    ])
+    def test_redirect(self, description, url):
+        ShortUrl(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM).save()
+
+        response = self.client.get(url)
+
+        message = f'failed to redirect {description}'
+        self.assertIn(response.status_code, {301, 302}, message)
+        self.assertEqual(EXAMPLE_DOT_COM, response.headers['Location'], message)
+
+    @parameterized.expand([
+        ('with trailing backslash', f'/unknown/'),
+        ('without trailing backslash', f'/unknown'),
+    ])
+    def test_unknown_slug(self, description, url):
+        response = self.client.get(url)
+
+        self.assertEqual(404, response.status_code, f'failed to give a 404 response {description}')
