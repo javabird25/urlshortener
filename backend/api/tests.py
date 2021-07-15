@@ -9,7 +9,7 @@ from parameterized import parameterized
 
 from . import shorten
 from .models import ShortUrl
-from .shorten import RandomSlugSpaceExhaustedError
+from .shorten import NoFreeSlugsError
 
 SHORTEN_ENDPOINT = '/api/shorten/'
 EXAMPLE_DOT_COM = 'http://example.com'
@@ -67,7 +67,7 @@ class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
 
     @patch('api.shorten.generate_unique_slug')
     def test_exhausted_random_slug_space(self, generate_unique_slug):
-        generate_unique_slug.side_effect = RandomSlugSpaceExhaustedError()
+        generate_unique_slug.side_effect = NoFreeSlugsError()
 
         response = self.client.post(SHORTEN_ENDPOINT, {'url': EXAMPLE_DOT_COM})
 
@@ -99,7 +99,7 @@ class GenerateUniqueSlugTestCase(TestCase):
         ShortUrl(slug=slug, url=EXAMPLE_DOT_COM).save()
         choices.return_value = slug
 
-        with self.assertRaises(RandomSlugSpaceExhaustedError):
+        with self.assertRaises(NoFreeSlugsError):
             shorten.generate_unique_slug(1)
 
     @parameterized.expand([(0,), (-1,)])

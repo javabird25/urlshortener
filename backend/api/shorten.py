@@ -30,11 +30,11 @@ def generate_unique_slug(length: int) -> str:
             return generate_unique_slug(length)
         except RecursionError:
             # Slug space of this length is (almost) exhausted
-            raise RandomSlugSpaceExhaustedError()
+            raise NoFreeSlugsError()
     return slug
 
 
-class RandomSlugSpaceExhaustedError(Exception):
+class NoFreeSlugsError(Exception):
     pass
 
 

@@ -13,7 +13,7 @@ def shorten_view(request: Request) -> HttpResponse:
         return HttpResponseBadRequest()
     try:
         slug = request.data.get('slug', shorten.generate_unique_slug(6))
-    except shorten.RandomSlugSpaceExhaustedError:
+    except shorten.NoFreeSlugsError:
         return HttpResponse('Random slug space is exhausted. Try shortening with a longer slug.',
                             status=409)
     try:
