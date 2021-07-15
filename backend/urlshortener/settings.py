@@ -19,6 +19,13 @@ INSTALLED_APPS = [
     'rest_framework',
 ]
 
+# Additional manage.py tools like show_urls
+try:
+    import django_extensions
+    INSTALLED_APPS += ['django_extensions']
+except ImportError:
+    pass
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
