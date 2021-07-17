@@ -38,6 +38,8 @@ def _shorten(slug: str, url: str) -> None:
         shorten.shorten(slug, url)
     except shorten.ShortenDuplicateError as e:
         raise Conflict('This slug is already occupied.') from e
+    except shorten.ShortenBadInputError as e:
+        raise ParseError(str(e)) from e
 
 
 @api_view(['GET'])
@@ -56,3 +58,16 @@ def redirect_view(request: HttpRequest, slug: str) -> HttpResponse:
         return redirect(shorten.unshorten(slug))
     except shorten.UnshortenError:
         return HttpResponseNotFound()
+
+
+@api_view(['GET'])
+def slug_view(request: Request) -> HttpResponse:
+    try:
+        return HttpResponse(shorten.generate_unique_slug(int(request.query_params['length'])))
+    except shorten.NoFreeSlugsError:
+        return HttpResponse('Random slug space is exhausted. Try shortening with a longer slug.',
+                            status=409)
+    except KeyError:
+        return HttpResponseBadRequest('Slug length has to be specified.')
+    except ValueError as e:
+        return HttpResponseBadRequest(str(e))

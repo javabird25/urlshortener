@@ -49,6 +49,11 @@ class ShorteningAPIEndpointTestCase(APITestCase):
         self.assertEqual(409, response.status_code)
         self.assertEqual('This slug is already occupied.', response.content.decode())
 
+    def test_zero_length_slug(self):
+        response = self.client.post(SHORTEN_ENDPOINT, {'slug': '', 'url': EXAMPLE_DOT_COM})
+
+        self.assertEqual(400, response.status_code)
+
 
 class CustomSlugShorteningAPIEndpointTestCase(APITestCase):
     def test_response_contains_slug(self):
@@ -71,6 +76,43 @@ class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
         self.assertEqual(409, response.status_code)
         self.assertEqual('Random slug space is exhausted. Try shortening with a longer slug.',
                          response.content.decode())
+
+
+class SlugGeneratorAPIEndpointTestCase(APITestCase):
+    def test_status_code_is_200(self):
+        response = self.client.get('/api/slug/', {'length': 6})
+
+        self.assertEqual(200, response.status_code)
+
+    def test_generates_slugs_of_specified_length(self):
+        response = self.client.get('/api/slug/', {'length': 6})
+
+        self.assertEqual(6, len(response.content.decode()))
+
+    @patch('api.shorten.generate_unique_slug')
+    def test_no_free_slugs(self, slug_gen_mock):
+        slug_gen_mock.side_effect = shorten.NoFreeSlugsError()
+
+        response = self.client.get('/api/slug/', {'length': 6})
+
+        self.assertEqual(409, response.status_code)
+
+    def test_no_length_specified(self):
+        response = self.client.get('/api/slug/')
+
+        self.assertEqual(400, response.status_code)
+
+    @parameterized.expand([
+        ('negative length', -1),
+        ('zero length', 0),
+        ('not a number', 'what'),
+        ('float', 6.9),
+    ])
+    def test_bad_length(self, description, length):
+        response = self.client.get('/api/slug/', {'length': str(length)})
+
+        self.assertEqual(400, response.status_code,
+                         f'failed to return a 400 response for {description}')
 
 
 class GenerateUniqueSlugTestCase(TestCase):

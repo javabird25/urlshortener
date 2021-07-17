@@ -15,7 +15,7 @@ def shorten(slug: str, url: str):
     try:
         short_url.full_clean()
     except ValidationError as e:
-        raise ShortenBadInputError() from e
+        raise ShortenBadInputError(str(e)) from e
 
     short_url.save()
 
