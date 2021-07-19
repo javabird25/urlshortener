@@ -7,6 +7,7 @@ from parameterized import parameterized
 from . import EXAMPLE_DOT_COM, SOME_DIFFERENT_URL_DOT_COM, SLUG_EXAMPLE, UUID_NULL, UUID_123
 from .. import shorten
 from ..models import ShortUrl
+from ..serializers import ShortUrlSerializer
 from ..shorten import NoFreeSlugsError
 
 
@@ -123,3 +124,12 @@ class RedirectionTestCase(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(404, response.status_code, f'failed to give a 404 response {description}')
+
+
+class ShortUrlSerializerTestCase(TestCase):
+    def test_serialize(self):
+        url = ShortUrl(url=EXAMPLE_DOT_COM, slug=SLUG_EXAMPLE, user_id=UUID_NULL)
+        serializer = ShortUrlSerializer(url)
+        serialized = serializer.data
+
+        self.assertEqual({'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE}, serialized)

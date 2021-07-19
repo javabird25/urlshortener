@@ -1,12 +1,14 @@
+import uuid
 from unittest.mock import patch
 
 from parameterized import parameterized
 from rest_framework.test import APITestCase
 
 from . import SHORTEN_ENDPOINT, EXAMPLE_DOT_COM, SLUG_EXAMPLE, \
-    SOME_DIFFERENT_URL_DOT_COM, get_response_str, UUID_NULL
+    SOME_DIFFERENT_URL_DOT_COM, get_response_str, UUID_NULL, UUID_123
 from .. import shorten
 from ..models import ShortUrl
+from ..serializers import ShortUrlSerializer
 from ..shorten import NoFreeSlugsError
 
 
@@ -152,3 +154,28 @@ class UnshorteningAPIEndpointTestCase(APITestCase):
         response = self.unshorten(None)
 
         self.assertEqual(400, response.status_code)
+
+
+class UserURLListingAPITestCase(APITestCase):
+    def test_no_user_id(self):
+        response = self.client.get('/api/urls/')
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
+
+    def test_gives_only_users_urls(self):
+        expected_user_123s_urls = [
+            ShortUrl(url=EXAMPLE_DOT_COM, slug='slug1', user_id=UUID_123),
+            ShortUrl(url=SOME_DIFFERENT_URL_DOT_COM, slug='slug2', user_id=UUID_123),
+        ]
+        for url in expected_user_123s_urls:
+            url.save()
+        ShortUrl(url='http://thirdurl.com', slug='slug3', user_id=uuid.uuid4()).save()
+
+        session = self.client.session
+        session['user_id'] = str(UUID_123)
+        session.save()
+        response = self.client.get('/api/urls/')
+
+        self.assertEqual(ShortUrlSerializer(expected_user_123s_urls, many=True).data,
+                         response.json())

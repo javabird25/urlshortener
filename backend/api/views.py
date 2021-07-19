@@ -5,9 +5,10 @@ from django.http.response import HttpResponse, HttpResponseBadRequest, HttpRespo
 from django.shortcuts import redirect
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ParseError
+from rest_framework.generics import ListAPIView
 from rest_framework.request import Request
 
-from . import shorten
+from . import shorten, models, serializers
 from .exceptions import Conflict
 
 
@@ -82,3 +83,13 @@ def slug_view(request: Request) -> HttpResponse:
         return HttpResponseBadRequest('Slug length has to be specified.')
     except ValueError as e:
         return HttpResponseBadRequest(str(e))
+
+
+class UserURLsListingView(ListAPIView):
+    serializer_class = serializers.ShortUrlSerializer
+
+    def get_queryset(self):
+        session = self.request.session
+        if 'user_id' not in session:
+            return models.ShortUrl.objects.none()
+        return models.ShortUrl.objects.filter(user_id=self.request.session['user_id'])
