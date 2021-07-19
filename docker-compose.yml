@@ -5,6 +5,10 @@ services:
     build: ./backend
     volumes:
       - backend-socket:/run/backend
+    depends_on:
+      - db
+    secrets:
+      - db-password
   nginx:
     build: ./frontend
     volumes:
@@ -12,5 +16,24 @@ services:
     ports:
       - "80:80"
 
+  db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: 1
+      MYSQL_DATABASE: urlshortener
+      MYSQL_USER: urlshortener
+      MYSQL_PASSWORD_FILE: /run/secrets/db-password
+    secrets:
+      - db-password
+    volumes:
+      - db:/var/lib/mysql
+
 volumes:
   backend-socket:
+  db:
+
+secrets:
+  db-password:
+    file: db-password.txt

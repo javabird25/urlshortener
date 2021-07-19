@@ -4,6 +4,8 @@ RUN adduser -s /sbin/nologin -S app && \
     mkdir -p /usr/src/app /run/backend && \
     chown app /usr/src/app /run/backend
 
+RUN apk add --no-cache mariadb-connector-c-dev gcc musl-dev
+
 WORKDIR /usr/src/app
 
 # Dependencies
