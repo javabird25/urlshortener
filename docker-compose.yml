@@ -5,6 +5,8 @@ services:
     build: ./backend
     volumes:
       - backend-socket:/run/backend
+    environment:
+      DOCKER: 1
     depends_on:
       - db
     secrets:

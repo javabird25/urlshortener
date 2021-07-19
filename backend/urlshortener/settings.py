@@ -5,7 +5,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-ygk5(#vjn1221jx8t1$^uy@7!sp(i@^*&70!g2dwi8*pnd-j1t'
 
-DEBUG = bool(int(os.environ.get('DEBUG', '0')))
+
+def envbool(name: str, default: str) -> bool:
+    return bool(int(os.environ.get(name, default)))
+
+
+DEBUG = envbool('DEBUG', '0')
+DOCKER = envbool('DOCKER', '0')
 
 ALLOWED_HOSTS = []
 
@@ -57,16 +63,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'urlshortener.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'urlshortener',
-        'USER': 'urlshortener',
-        'PASSWORD': open('/run/secrets/db-password').read(),
-        'HOST': 'db',
-        'PORT': '3306',
+if DOCKER:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'urlshortener',
+            'USER': 'urlshortener',
+            'PASSWORD': open('/run/secrets/db-password').read(),
+            'HOST': 'db',
+            'PORT': '3306',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
