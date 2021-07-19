@@ -4,21 +4,27 @@ from parameterized import parameterized
 from rest_framework.test import APITestCase
 
 from . import SHORTEN_ENDPOINT, EXAMPLE_DOT_COM, SLUG_EXAMPLE, \
-    SOME_DIFFERENT_URL_DOT_COM, get_response_str
+    SOME_DIFFERENT_URL_DOT_COM, get_response_str, UUID_NULL
 from .. import shorten
 from ..models import ShortUrl
 from ..shorten import NoFreeSlugsError
 
 
-class ShorteningAPIEndpointTestCase(APITestCase):
-    def setUp(self):
-        self.custom_slug_response = self.client.post(SHORTEN_ENDPOINT,
-                                                     {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
-        self.random_slug_response = self.client.post(SHORTEN_ENDPOINT,
-                                                     {'url': EXAMPLE_DOT_COM})
-        self.responses = [self.custom_slug_response, self.random_slug_response]
+class ShorteningAPITestCaseBase(APITestCase):
+    def make_custom_slug_request(self):
+        return self.client.post(SHORTEN_ENDPOINT,
+                                {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
+
+
+class ShorteningAPIEndpointTestCase(ShorteningAPITestCaseBase):
+    def make_two_requests(self):
+        custom_slug_response = self.make_custom_slug_request()
+        random_slug_response = self.client.post(SHORTEN_ENDPOINT,
+                                                {'url': EXAMPLE_DOT_COM})
+        return custom_slug_response, random_slug_response
 
     def test_saves_to_db(self):
+        self.make_two_requests()
         self.assertEqual(2, len(ShortUrl.objects.filter(url=EXAMPLE_DOT_COM)))
         self.assertTrue(ShortUrl.objects.filter(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM))
 
@@ -27,15 +33,18 @@ class ShorteningAPIEndpointTestCase(APITestCase):
         self.assertEqual(400, response.status_code)
 
     def test_status_code_is_200(self):
-        self.assertTrue(all([resp.status_code == 200 for resp in self.responses]))
+        responses = self.make_two_requests()
+        self.assertTrue(all([resp.status_code == 200 for resp in responses]))
 
     def test_content_type(self):
+        responses = self.make_two_requests()
         self.assertTrue(all([resp.headers['Content-Type'] == 'text/plain; charset=utf-8'
-                             for resp in self.responses]))
+                             for resp in responses]))
 
     def test_occupied_slug(self):
-        response = self.client.post(SHORTEN_ENDPOINT,
-                                    {'url': SOME_DIFFERENT_URL_DOT_COM, 'slug': SLUG_EXAMPLE})
+        self.make_custom_slug_request()
+        response = self.make_custom_slug_request()
+
         self.assertEqual(409, response.status_code)
         self.assertEqual('This slug is already occupied.', response.content.decode())
 
@@ -43,6 +52,22 @@ class ShorteningAPIEndpointTestCase(APITestCase):
         response = self.client.post(SHORTEN_ENDPOINT, {'slug': '', 'url': EXAMPLE_DOT_COM})
 
         self.assertEqual(400, response.status_code)
+
+
+class ShorteningAPIEndpointAuthorizationTestCase(ShorteningAPITestCaseBase):
+    def test_records_user_id_in_db(self):
+        self.make_custom_slug_request()
+
+        url_model = ShortUrl.objects.all()[0]
+        self.assertEqual(self.client.session['user_id'], str(url_model.user_id))
+
+    def test_keeps_user_id_between_requests(self):
+        self.make_custom_slug_request()
+        id1 = self.client.session['user_id']
+        self.make_custom_slug_request()
+        id2 = self.client.session['user_id']
+
+        self.assertEqual(id1, id2)
 
 
 class CustomSlugShorteningAPIEndpointTestCase(APITestCase):
@@ -107,7 +132,7 @@ class SlugGeneratorAPIEndpointTestCase(APITestCase):
 
 class UnshorteningAPIEndpointTestCase(APITestCase):
     def setUp(self):
-        ShortUrl(url=EXAMPLE_DOT_COM, slug=SLUG_EXAMPLE).save()
+        ShortUrl(url=EXAMPLE_DOT_COM, slug=SLUG_EXAMPLE, user_id=UUID_NULL).save()
         self.response = self.unshorten({'slug': SLUG_EXAMPLE})
 
     def unshorten(self, params):

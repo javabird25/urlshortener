@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ValidationError
 from .models import ShortUrl
 from string import ascii_letters, digits
@@ -6,11 +8,11 @@ import random
 _SYMBOLS = ascii_letters + digits
 
 
-def shorten(slug: str, url: str):
+def shorten(slug: str, url: str, user_id: uuid.UUID):
     if ShortUrl.objects.filter(slug=slug).exists():
         raise ShortenDuplicateError()
 
-    short_url = ShortUrl(slug=slug, url=url)
+    short_url = ShortUrl(slug=slug, url=url, user_id=user_id)
 
     try:
         short_url.full_clean()

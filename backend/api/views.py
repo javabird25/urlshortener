@@ -1,3 +1,5 @@
+import uuid
+
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 from django.shortcuts import redirect
@@ -13,7 +15,8 @@ from .exceptions import Conflict
 def shorten_view(request: Request) -> HttpResponse:
     url = _get_url(request)
     slug = _get_slug(request)
-    _shorten(slug, url)
+    user_id = _authorize_user(request)
+    _shorten(slug, url, user_id)
     response = HttpResponse(slug)
     response['Content-Type'] = 'text/plain; charset=utf-8'
     return response
@@ -33,9 +36,17 @@ def _get_slug(request: Request) -> str:
         raise Conflict('Random slug space is exhausted. Try shortening with a longer slug.') from e
 
 
-def _shorten(slug: str, url: str) -> None:
+def _authorize_user(request: Request) -> uuid.UUID:
+    if 'user_id' in request.session:
+        return uuid.UUID(request.session['user_id'])
+    user_token = uuid.uuid4()
+    request.session['user_id'] = str(user_token)
+    return user_token
+
+
+def _shorten(slug: str, url: str, user_id: uuid.UUID) -> None:
     try:
-        shorten.shorten(slug, url)
+        shorten.shorten(slug, url, user_id)
     except shorten.ShortenDuplicateError as e:
         raise Conflict('This slug is already occupied.') from e
     except shorten.ShortenBadInputError as e:
