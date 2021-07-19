@@ -5,12 +5,14 @@ services:
     build: ./backend
     volumes:
       - backend-socket:/run/backend
+      - redis-socket:/run/redis
     environment:
       DOCKER: 1
     depends_on:
       - db
     secrets:
       - db-password
+
   nginx:
     build: ./frontend
     volumes:
@@ -32,8 +34,15 @@ services:
     volumes:
       - db:/var/lib/mysql
 
+  redis:
+    build: ./redis
+    restart: always
+    volumes:
+      - redis-socket:/run/redis
+
 volumes:
   backend-socket:
+  redis-socket:
   db:
 
 secrets:

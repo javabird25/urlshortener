@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.test.testcases import TestCase
 from django.core.exceptions import ValidationError
 from parameterized import parameterized
+from fakeredis import FakeRedis
 
 from . import EXAMPLE_DOT_COM, SOME_DIFFERENT_URL_DOT_COM, SLUG_EXAMPLE, UUID_NULL, UUID_123
 from .. import shorten
@@ -43,44 +44,59 @@ class GenerateUniqueSlugTestCase(TestCase):
             shorten.generate_unique_slug(length)
 
 
+@patch('api.redis.redis', new_callable=FakeRedis)
 class ShortenUnshortenTestCase(TestCase):
-    def test_shorten_saves_to_db(self):
+    def test_shorten_saves_to_db(self, _):
         shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM, UUID_NULL)
 
         short_url_model = ShortUrl.objects.get(slug=SLUG_EXAMPLE)
         self.assertEqual(EXAMPLE_DOT_COM, short_url_model.url)
 
-    def test_shorten_duplicate_slug(self):
+    def test_shorten_duplicate_slug(self, _):
         shorten.shorten(SLUG_EXAMPLE, EXAMPLE_DOT_COM, UUID_NULL)
         with self.assertRaises(shorten.ShortenDuplicateError):
             shorten.shorten(SLUG_EXAMPLE, SOME_DIFFERENT_URL_DOT_COM, UUID_123)
 
-    def test_shorten_bad_slug(self):
+    def test_shorten_bad_slug(self, _):
         with self.assertRaises(shorten.ShortenBadInputError):
             shorten.shorten(', !"', EXAMPLE_DOT_COM, UUID_NULL)
 
-    def test_shorten_bad_url(self):
+    def test_shorten_bad_url(self, _):
         with self.assertRaises(shorten.ShortenBadInputError):
             shorten.shorten(SLUG_EXAMPLE, 'not an URL', UUID_NULL)
 
-    def test_unshorten_loads_from_db(self):
+    def test_unshorten_loads_from_db(self, _):
         ShortUrl(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM, user_id=UUID_NULL).save()
 
         long_url = shorten.unshorten(SLUG_EXAMPLE)
 
         self.assertEqual(EXAMPLE_DOT_COM, long_url)
 
-    def test_unshorten_unknown_url(self):
+    def test_unshorten_unknown_url(self, _):
         with self.assertRaises(shorten.UnshortenError):
             shorten.unshorten(SLUG_EXAMPLE)
 
-    def test_shorten_unshorten(self):
+    def test_shorten_unshorten(self, _):
         expected_long_url = EXAMPLE_DOT_COM
 
         shorten.shorten(SLUG_EXAMPLE, expected_long_url, UUID_NULL)
         actual_long_url = shorten.unshorten(SLUG_EXAMPLE)
 
         self.assertEqual(expected_long_url, actual_long_url)
+
+    def test_unshortening_pulls_from_cache(self, redis: FakeRedis):
+        redis.set(SLUG_EXAMPLE, EXAMPLE_DOT_COM)
+        with self.assertNumQueries(0):
+            url = shorten.unshorten(SLUG_EXAMPLE)
+            self.assertEqual(EXAMPLE_DOT_COM, url)
+
+    def test_unshortening_saves_to_cache(self, redis: FakeRedis):
+        slug = SLUG_EXAMPLE
+        shorten.shorten(slug, EXAMPLE_DOT_COM, UUID_NULL)
+
+        shorten.unshorten(slug)
+
+        self.assertEqual(EXAMPLE_DOT_COM, redis.get(slug).decode())
 
 
 class ShortUrlModelTestCase(TestCase):
@@ -102,12 +118,13 @@ class ShortUrlModelTestCase(TestCase):
             ShortUrl(slug='1', url='http://' + 'a' * 200 + '.com', user_id=UUID_NULL).full_clean()
 
 
+@patch('api.redis.redis', new_callable=FakeRedis)
 class RedirectionTestCase(TestCase):
     @parameterized.expand([
         ('with trailing backslash', f'/{SLUG_EXAMPLE}/'),
         ('without trailing backslash', f'/{SLUG_EXAMPLE}'),
     ])
-    def test_redirect(self, description, url):
+    def test_redirect(self, _, description, url):
         ShortUrl(slug=SLUG_EXAMPLE, url=EXAMPLE_DOT_COM, user_id=UUID_NULL).save()
 
         response = self.client.get(url)
@@ -120,7 +137,7 @@ class RedirectionTestCase(TestCase):
         ('with trailing backslash', f'/unknown/'),
         ('without trailing backslash', f'/unknown'),
     ])
-    def test_unknown_slug(self, description, url):
+    def test_unknown_slug(self, _, description, url):
         response = self.client.get(url)
 
         self.assertEqual(404, response.status_code, f'failed to give a 404 response {description}')

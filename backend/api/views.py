@@ -8,7 +8,8 @@ from rest_framework.exceptions import ParseError
 from rest_framework.generics import ListAPIView
 from rest_framework.request import Request
 
-from . import shorten, models, serializers
+from . import models, serializers
+from . import shorten
 from .exceptions import Conflict
 
 

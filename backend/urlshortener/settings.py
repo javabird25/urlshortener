@@ -114,3 +114,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'api.exceptions.exception_handler'
 }
+
+REDIS = {
+    'unix_socket_path': '/run/redis/redis.socket'
+}

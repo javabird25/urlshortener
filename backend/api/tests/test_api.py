@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import patch
 
+from fakeredis import FakeRedis
 from parameterized import parameterized
 from rest_framework.test import APITestCase
 
@@ -132,25 +133,26 @@ class SlugGeneratorAPITestCase(APITestCase):
                          f'failed to return a 400 response for {description}')
 
 
+@patch('api.redis.redis', new_callable=FakeRedis)
 class UnshorteningAPITestCase(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         ShortUrl(url=EXAMPLE_DOT_COM, slug=SLUG_EXAMPLE, user_id=UUID_NULL).save()
-        self.response = self.unshorten({'slug': SLUG_EXAMPLE})
 
     def unshorten(self, params):
         return self.client.get('/api/unshorten/', params)
 
-    def test_unshorten(self):
-        actual_url = get_response_str(self.response)
+    def test_unshorten(self, _):
+        actual_url = get_response_str(self.unshorten({'slug': SLUG_EXAMPLE}))
 
         self.assertEqual(EXAMPLE_DOT_COM, actual_url)
 
-    def test_unshorten_unknown(self):
+    def test_unshorten_unknown(self, _):
         response = self.unshorten({'slug': 'not_there'})
 
         self.assertEqual(404, response.status_code)
 
-    def test_slug_not_specified(self):
+    def test_slug_not_specified(self, _):
         response = self.unshorten(None)
 
         self.assertEqual(400, response.status_code)
