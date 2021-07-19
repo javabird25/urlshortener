@@ -18,7 +18,7 @@ class ShorteningAPITestCaseBase(APITestCase):
                                 {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
 
 
-class ShorteningAPIEndpointTestCase(ShorteningAPITestCaseBase):
+class ShorteningAPITestCase(ShorteningAPITestCaseBase):
     def make_two_requests(self):
         custom_slug_response = self.make_custom_slug_request()
         random_slug_response = self.client.post(SHORTEN_ENDPOINT,
@@ -56,7 +56,7 @@ class ShorteningAPIEndpointTestCase(ShorteningAPITestCaseBase):
         self.assertEqual(400, response.status_code)
 
 
-class ShorteningAPIEndpointAuthorizationTestCase(ShorteningAPITestCaseBase):
+class ShorteningAPIAuthorizationTestCase(ShorteningAPITestCaseBase):
     def test_records_user_id_in_db(self):
         self.make_custom_slug_request()
 
@@ -72,14 +72,14 @@ class ShorteningAPIEndpointAuthorizationTestCase(ShorteningAPITestCaseBase):
         self.assertEqual(id1, id2)
 
 
-class CustomSlugShorteningAPIEndpointTestCase(APITestCase):
+class CustomSlugShorteningAPITestCase(APITestCase):
     def test_response_contains_slug(self):
         response = self.client.post(SHORTEN_ENDPOINT,
                                     {'url': EXAMPLE_DOT_COM, 'slug': SLUG_EXAMPLE})
         self.assertEqual(SLUG_EXAMPLE, response.content.decode())
 
 
-class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
+class RandomSlugShorteningAPITestCase(APITestCase):
     def test_response_content(self):
         slug = self.client.post(SHORTEN_ENDPOINT, {'url': EXAMPLE_DOT_COM}).content.decode()
         self.assertEqual(6, len(slug), f'unexpected request length. Request content repr: {slug!r}')
@@ -95,7 +95,7 @@ class RandomSlugShorteningAPIEndpointTestCase(APITestCase):
                          response.content.decode())
 
 
-class SlugGeneratorAPIEndpointTestCase(APITestCase):
+class SlugGeneratorAPITestCase(APITestCase):
     def test_status_code_is_200(self):
         response = self.client.get('/api/slug/', {'length': 6})
 
@@ -132,7 +132,7 @@ class SlugGeneratorAPIEndpointTestCase(APITestCase):
                          f'failed to return a 400 response for {description}')
 
 
-class UnshorteningAPIEndpointTestCase(APITestCase):
+class UnshorteningAPITestCase(APITestCase):
     def setUp(self):
         ShortUrl(url=EXAMPLE_DOT_COM, slug=SLUG_EXAMPLE, user_id=UUID_NULL).save()
         self.response = self.unshorten({'slug': SLUG_EXAMPLE})
