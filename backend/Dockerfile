@@ -1,16 +1,17 @@
 FROM python:alpine
 
-RUN adduser -H -s /sbin/nologin -S app && \
-    mkdir -p /usr/src/app && \
-    chown app /usr/src/app
+RUN adduser -s /sbin/nologin -S app && \
+    mkdir -p /usr/src/app /run/backend && \
+    chown app /usr/src/app /run/backend
 
-USER app
 WORKDIR /usr/src/app
 
 # Dependencies
-COPY requirements.txt .
-RUN pip install --user -r requirements.txt
+COPY --chown=app:nogroup requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
+
+USER app
 
 COPY . .
 
-CMD ["echo", "hello"]
+CMD ["gunicorn", "urlshortener.wsgi"]

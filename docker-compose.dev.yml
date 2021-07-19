@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  backend:
+    environment:
+      DEBUG: 1
+  nginx:
+    volumes:
+      - ./frontend/config.nginx:/etc/nginx/nginx.conf
