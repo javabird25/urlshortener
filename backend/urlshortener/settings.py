@@ -118,5 +118,5 @@ REST_FRAMEWORK = {
 }
 
 REDIS = {
-    'unix_socket_path': '/run/redis/redis.socket'
+    'host': 'redis',
 }

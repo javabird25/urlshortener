@@ -5,7 +5,6 @@ services:
     build: ./backend
     volumes:
       - backend-socket:/run/backend
-      - redis-socket:/run/redis
     environment:
       DOCKER: 1
     depends_on:
@@ -35,14 +34,11 @@ services:
       - db:/var/lib/mysql
 
   redis:
-    build: ./redis
+    image: redis:alpine
     restart: always
-    volumes:
-      - redis-socket:/run/redis
 
 volumes:
   backend-socket:
-  redis-socket:
   db:
 
 secrets:
