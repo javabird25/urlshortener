@@ -93,4 +93,4 @@ class UserURLsListingView(ListAPIView):
         session = self.request.session
         if 'user_id' not in session:
             return models.ShortUrl.objects.none()
-        return models.ShortUrl.objects.filter(user_id=self.request.session['user_id'])
+        return models.ShortUrl.objects.filter(user_id=self.request.session['user_id']).order_by('created_at')

@@ -162,8 +162,10 @@ class UserURLListingAPITestCase(APITestCase):
     def test_no_user_id(self):
         response = self.client.get('/api/urls/')
 
+        response_json = response.json()
         self.assertEqual(200, response.status_code)
-        self.assertEqual([], response.json())
+        self.assertEqual(0, response_json['count'])
+        self.assertEqual([], response_json['results'])
 
     def test_gives_only_users_urls(self):
         expected_user_123s_urls = [
@@ -177,7 +179,27 @@ class UserURLListingAPITestCase(APITestCase):
         session = self.client.session
         session['user_id'] = str(UUID_123)
         session.save()
-        response = self.client.get('/api/urls/')
+        json = self.client.get('/api/urls/').json()
 
         self.assertEqual(ShortUrlSerializer(expected_user_123s_urls, many=True).data,
-                         response.json())
+                         json['results'])
+
+    def test_pagination(self):
+        for i in range(60):
+            ShortUrl(url=EXAMPLE_DOT_COM, slug=f'slug{i}', user_id=UUID_NULL).save()
+
+        session = self.client.session
+        session['user_id'] = str(UUID_NULL)
+        session.save()
+        json = self.client.get('/api/urls/?page=1').json()
+
+        self.assertEqual(60, json['count'])
+        self.assertEqual(50, len(json['results']))
+
+    def test_empty_first_page(self):
+        response = self.client.get('/api/urls/?page=1')
+
+        response_json = response.json()
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(0, response_json['count'])
+        self.assertEqual([], response_json['results'])

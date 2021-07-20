@@ -6,3 +6,4 @@ class ShortUrl(models.Model):
                             primary_key=True)
     url = models.URLField('shortened URL')
     user_id = models.UUIDField('ephemeral user ID')
+    created_at = models.DateTimeField('creation time', auto_now_add=True)
