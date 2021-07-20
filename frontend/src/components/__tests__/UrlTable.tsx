@@ -68,5 +68,3 @@ it.skip('changes the page on "Next page" button click', async () => {
         screen.getByText('51');
     });
 });
-
-

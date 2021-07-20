@@ -31,11 +31,12 @@ it('renders with a random slug and an example URL', async () => {
 });
 
 it('sends a shortening request on button press', async () => {
+    const onShortenCallback = jest.fn();
     const slug = 'a_slug';
     const url = 'https://google.com';
     axiosMock.post.mockResolvedValue({data: ''});
 
-    render(<Shortener/>);
+    render(<Shortener onShorten={onShortenCallback}/>);
 
     const slugInput = screen.getByTitle(SLUG_INPUT_TITLE);
     userEvent.clear(slugInput);
@@ -49,6 +50,7 @@ it('sends a shortening request on button press', async () => {
 
     await waitFor(() => {
         expect(axiosMock.post).toBeCalledWith('/api/shorten/', {slug, url});
+        expect(onShortenCallback).toBeCalled();
     });
 });
 

@@ -3,7 +3,7 @@ import {useEffect, useState} from 'react';
 import axios from 'axios';
 import randomSlug from '../slug';
 
-export function Shortener() {
+export function Shortener({onShorten}: { onShorten?: () => void }) {
     const [slug, setSlug] = useState('');
     const [url, setUrl] = useState('https://example.com');
 
@@ -12,14 +12,19 @@ export function Shortener() {
     }, []);
 
     function shorten() {
-        axios.post('/api/shorten/', {slug, url}).catch(err => {
-            if (err.status === 409) {
-                alert('This short URL is occupied. Please try another one.');
-                return;
+        axios.post('/api/shorten/', {slug, url}).then(
+            () => {
+                onShorten?.();
+            },
+            err => {
+                if (err.status === 409) {
+                    alert('This short URL is occupied. Please try another one.');
+                    return;
+                }
+                alert('An unexpected error has occurred. Please try again later.');
+                console.error(err);
             }
-            alert('An unexpected error has occurred. Please try again later.');
-            console.error(err);
-        });
+        );
     }
 
     return <div>
