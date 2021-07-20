@@ -26,7 +26,7 @@ export function Shortener() {
         short.en/
         <input className="slug" value={slug} onChange={e => setSlug(e.target.value)}
                title="Shortened URL part"/>
-        =
+        &nbsp;=&nbsp;
         <input className="url" value={url} onChange={e => setUrl(e.target.value)}
                title="URL to shorten"/>
         <button onClick={shorten}>Shorten</button>
